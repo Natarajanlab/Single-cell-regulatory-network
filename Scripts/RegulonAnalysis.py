@@ -1,3 +1,4 @@
+#Imports
 from matplotlib import pyplot as plt
 from sklearn import preprocessing
 import seaborn as sns
@@ -15,28 +16,11 @@ from scipy.cluster import hierarchy
 from scipy.special import rel_entr
 from math import sqrt
 from math import ceil, floor
-try:
-    from scipy.spatial.distance import jensenshannon
-except:
-    def jensenshannon(p, q, base=None):
-        """
-        Compute the Jensen-Shannon distance (metric) between
-        two 1-D probability arrays. 
-        """
-        p = np.asarray(p)
-        q = np.asarray(q)
-        p = p / np.sum(p, axis=0)
-        q = q / np.sum(q, axis=0)
-        m = (p + q) / 2.0
-        left = rel_entr(p, m)
-        right = rel_entr(q, m)
-        js = np.sum(left, axis=0) + np.sum(right, axis=0)
-        if base is not None:
-            js /= np.log(base)
-        return np.sqrt(js / 2.0)
+from scipy.spatial.distance import jensenshannon
 
 
 
+#Class for regulon analysis
 class RegulonsAnalysis():
     """Module for analysis of regulon activity. 
         regulons: Regulon object - Output of RCisTarget.
@@ -66,16 +50,15 @@ class RegulonsAnalysis():
             if sum(self.auc_mtx[i]) == 0:
                 del self.auc_mtx[i]
     
-
-    ######
     def cell_regulon_cor(self, color_index, color_by):
         """Plots spearmman cell-cell correlation"""
         #Calculate spearman correlation of regulon activities of single cells
         self.spear_corr, _ = spearmanr(self.auc_mtx, axis = 1)
-
+        #Color by celltype if using
         row_colors = self.get_cor_colors(color_index, color_by)
         row_colors = pd.DataFrame(data = row_colors.values, columns=['Celltype'], index = self.scanpy.obs_names.tolist())
         row_colors = pd.DataFrame(data = row_colors.values, columns=['Celltype'], index = self.scanpy.obs_names.tolist())
+        #Color by protocol if more than one unique protocol exist
         if len(set(self.regulon_scanpy.obs.protocol)) > 1: 
 
             row_colors['protocol'] = self.get_cor_colors_protocol().tolist()
@@ -98,16 +81,16 @@ class RegulonsAnalysis():
         return color
 
     def get_cor_colors_protocol(self):
-
+        #Define protocol palette
         lut = {'Smartseq2': '#279e68', '10X': '#1f77b4', 'Microwell-seq': '#ff7f0e'}
         color = self.regulon_scanpy.obs['protocol'].map(lut)
-
         return color
 
-    #######
     def cell_regulon_network(self, thresh, color_index, dr, pcs, color_by, save = None):
         """plot links between highly correlated cells """
+        #filter based on correlation threshold
         links_filtered = self.link_params(thresh)
+        #Build networkx graph
         G = self.build_graph(links_filtered)
         posis = self.pos_from_dr(dr, pcs)
         self.plot_network(posis, G, color_index, color_by, save)
@@ -115,14 +98,10 @@ class RegulonsAnalysis():
     
     def link_params(self, thresh):
         """Filter links on correlation threshold"""
-
         self.spear_corr = pd.DataFrame(data=self.spear_corr, index=self.ex_matrix.index, columns=self.ex_matrix.index)
-
-
         links = self.spear_corr.stack().reset_index()
         links.columns = ['var1', 'var2','value']
-
-        # Keep only correlation over a threshold and remove self correlation (cor(A,A)=1)
+        # Keep only correlation over a threshold and remove self correlation)
         links_filtered=links.loc[ (links['value'] > thresh) & (links['var1'] != links['var2']) ]
         return links_filtered
  
@@ -138,16 +117,15 @@ class RegulonsAnalysis():
         #Node position
         posis = dict()
         labels = list()
+        #Get embedding if precomputed
         dim = self.get_dr(dr, pcs)
         for i in range(len(self.ex_matrix.index)):
             posis[self.ex_matrix.index[i]] = [dim[i,0] , dim[i,1]]
-            #labels[self.ex_matrix.index[i]] = self.scanpy.obs['celltype'][i]
             
         return posis
     
     def plot_network(self, posis, G, color_index, color_by, save=None):
         """Plots the network on precomputed embedding and saves network as gexf file"""
-
         pos=posis
         self.got_colors = False
         # find node near center (0.5,0.5)
@@ -159,21 +137,24 @@ class RegulonsAnalysis():
             if d<dmin:
                 ncenter=n
                 dmin=d
-                
+        #Get the color for a node        
         for idx, node in enumerate(G.nodes):
             if idx != 0:
                 color = self.get_color(G, color_index, color_by)[idx]
                 self.got_colors = True
                 
             color = self.get_color(G, color_index, color_by)[idx]
+            #Convert to RGB 
             color = to_rgb(color)
             c = []
             for i in color:
                 c.append(i)
+            #convert from matplotlib 0-1 rbg scale back to 0-255 rgb scale
             c=[int(255*x) for x in c]
+            #save as network metadata
             G.nodes[node]['viz'] = {'color': {'r': c[0], 'g': c[1], 'b': c[2], 'a': 1}, 'position':{'x':pos[node][0],'y':pos[node][1]}, 'z':0.0000000000}
             
-
+        #Draw network
         plt.figure(figsize=(8,8))
         nx.draw_networkx_edges(G,pos,nodelist=[ncenter],alpha=0.005)
         nx.draw_networkx_nodes(G,pos,
@@ -185,6 +166,7 @@ class RegulonsAnalysis():
         
     def get_color(self, G, color_index, color_by):
         """Get colors for the network"""
+        #If already fetched, then just use them
         if self.got_colors == True:
             colors = self.colors
             return colors
@@ -207,15 +189,12 @@ class RegulonsAnalysis():
         self.colors = colors
         return colors
     
-    ######
     def pear_corr(self):
         """Calculates pearson correlation for use in 
         calculation"""
-    
         self.pear_corr_reg = pd.DataFrame(np.corrcoef(self.auc_mtx.T))
 
-    
-    ######
+  
     def calc_csi(self):
         """Calculates Connection specificity index (CSI)"""
         self.pear_corr()
@@ -235,13 +214,12 @@ class RegulonsAnalysis():
                 n = corr_mat.shape[0]
                 csi = 1 - (conn_pais_ab / n)
                 csi_mat[i,j] = csi
-                
-        
         self.csi_mat_df = pd.DataFrame(data=csi_mat, index=self.auc_mtx.columns.values, columns= self.auc_mtx.columns.values)
         return self.csi_mat_df
     
     def find_modules(self, csi_mat_df,cluster_n):
         """Performes hierachical clustering """
+        #Perform Agglomerative clustering on CSI matrix
         clustering = AgglomerativeClustering(affinity='euclidean', compute_full_tree='auto',
                     connectivity=None, linkage='complete', memory=None, n_clusters=cluster_n).fit(csi_mat_df)
         
@@ -261,7 +239,7 @@ class RegulonsAnalysis():
             If inputting clustering, one should also input colormap as lut"""
 
         csi_mat_df = self.calc_csi()
-        
+        #cluster if not using predefined clustering
         if cluster is None:
             clustering = self.find_modules(csi_mat_df, cluster_n)
             self.clustering = clustering
@@ -271,32 +249,32 @@ class RegulonsAnalysis():
         else:
             self.clustering = np.array(cluster, dtype='int32')
             self.lut = lut
-            
+        #color rows by cluster
         row_colors = pd.DataFrame(self.clustering)[0].map(self.lut)
         self.cluster_row_colors = row_colors
         
         g = sns.clustermap(csi_mat_df,
                            row_colors=row_colors.values,
                            figsize=(20,20),
-                           xticklabels = [],#self.get_new_names(csi_mat_df.index.tolist(), self.regulons),#self.get_new_names(self.get_regulon_names(self.regulons), self.regulons), 
-                           yticklabels = [],#self.get_new_names(csi_mat_df.index.tolist(), self.regulons), #self.get_new_names(self.get_regulon_names(self.regulons), self.regulons),
+                           xticklabels = [],
+                           yticklabels = [],
                            cmap ="viridis",  
                            annot_kws={"size": 3},
                           rasterized = True
                           )
 
-        
-    #######    
     def regulon_network(self, thresh, save, lut=None):
         """Plots the regulon-regulon network based ont he CSI matrix"""
+        #Find the links with higher CSI than threshold
         self.calc_links(thresh)
+        #Build and plot the graph
         G = self.build_graph_reg()
         self.plot_reg_network(G, self.color_nodes(G, lut), save)
         
         
     def calc_links(self, thresh):
         """Subsets link matrix based on threshold"""
-        
+        #Check that CSI matrix exists
         if hasattr(self, 'csi_mat_df'):
             pass
         else:
@@ -306,7 +284,7 @@ class RegulonsAnalysis():
         self.links_reg = self.csi_mat_df.stack().reset_index()
         self.links_reg.columns = ['var1', 'var2','value']
 
-        # Keep only correlation over a threshold and remove self correlation (cor(A,A)=1)
+        # Keep only correlation over a threshold and remove self correlation )
         self.links_filtered_reg=self.links_reg.loc[ (self.links_reg['value'] > thresh) & (self.links_reg['var1'] != self.links_reg['var2']) ]
     
     
@@ -322,6 +300,7 @@ class RegulonsAnalysis():
         if not hasattr(self, 'clustering'):
             self.clustering = self.find_modules(self.calc_csi())
         
+        #Save cluster coloring to graph metadata
         for idx, node in enumerate(G):
             labels.append(self.clustering[self.auc_mtx.columns.values == node])
             G.nodes[node]['cluster'] = str(self.clustering[self.auc_mtx.columns.values == node])
@@ -352,7 +331,7 @@ class RegulonsAnalysis():
         if type(save) == str:
             nx.write_gexf(G, save)
             
-    ######
+
     def avg_reg_activity(self, celltypes):
         #calculate average regulon activity of a celltype
         avg_activity = pd.DataFrame()
@@ -384,16 +363,14 @@ class RegulonsAnalysis():
             
         avg_reg = self.avg_reg_activity(celltypes)
         g = sns.clustermap(avg_reg.T, z_score=z_score,row_cluster=row_cluster, col_cluster=True, standard_scale=scale, cmap ="viridis", figsize=(20,20),
-                          rasterized = True)#, xticklabels = self.get_new_names(self.get_regulon_names(self.regulons), self.regulons))
-        #g.savefig(self.output_dir + save , dpi=1200, transparent=True)
-    #######    
+                          rasterized = True)
+   
     def binarize(self):
         from pyscenic.binarization import binarize
         from pyscenic.binarization import plot_binarization
         #Binarize AUCell_mtx
         binar, auc_thresholds = binarize(self.auc_mtx)
 
-        #plot_binarization(auc_mtx=self.auc_mtx, regulon_name="Cebpb(+)", bins = 25, threshold = None)#auc_thresholds)
         return binar
     
     def reg_enrichment(self):
@@ -415,10 +392,10 @@ class RegulonsAnalysis():
         sns.clustermap(reg_enrichment.T, z_score=z_score,row_cluster=True, cmap ="viridis", figsize=(20,20), xticklabels = self.get_new_names(self.get_regulon_names(self.regulons), self.regulons) , rasterized = True)
         
         
-        
-    #######    
+ 
     def make_regulon_scanpy(self):
         """Make scanpy object with on AUCell regulon activity matrix"""
+        #Import metadata
         self.auc_mtx.index = self.scanpy.obs_names.tolist()
         test = sc.AnnData(X = self.auc_mtx , obs = self.scanpy.obs['celltype'])
         test.obs['celltype'] =self.scanpy.obs['celltype'].values
@@ -434,8 +411,9 @@ class RegulonsAnalysis():
             test.obs['original_annotation'] =self.scanpy.obs['original_annotation'].values
         return test
         
-    #######    
+ 
     def new_pca(self, plot, color = 'celltype'):
+        #Compute PCA using scanpy
         if color == None:
             color = 'celltype'
         self.regulon_scanpy = self.make_regulon_scanpy()
@@ -446,7 +424,6 @@ class RegulonsAnalysis():
             pass
 
     
-    ######
     def color_by_celltype(self, color_index, color_by):
         """Make color map to use cell  color scheme """
         colors = {cell:color for cell,color in zip(color_index['celltype'], color_index[color_by])}
@@ -458,7 +435,8 @@ class RegulonsAnalysis():
     
     def get_dr(self, dr,pcs):
         """Computes and returns embedding"""
-        if dr != self.dr and pcs != self.pcs:
+        #Compute if it has not been computed
+        if dr != self.dr or pcs != self.pcs:
             self.dr = dr
             self.pcs = pcs  
             if dr == 'pca':
@@ -476,9 +454,11 @@ class RegulonsAnalysis():
                     self.comp_pca(pcs)
                     self.comp_umap(pcs)
                     return self.regulon_scanpy.obsm['X_umap']
+        #Use stored embedding
         else:
             return self.regulon_scanpy.obsm['X_'+dr]
             
+    #Use Scanpy to compute PCA, tsne or Umap
     def comp_pca(self,pcs):
         sc.tl.pca(self.regulon_scanpy, n_comps=pcs)
         
@@ -493,7 +473,7 @@ class RegulonsAnalysis():
     
     def plot_by_celltype(self, dr, color_index, pcs, color_by, point_size, Type = None, title = None):
         """Plot embedding and color by celltype"""
-
+        #Plot scatterplot of embedding and color by celltypes
         dr_mat = self.get_dr(dr,pcs)
         colors = self.color_by_celltype(color_index, color_by)
         plotting_df = pd.DataFrame()
@@ -517,7 +497,7 @@ class RegulonsAnalysis():
 
     
     def plot_by_celltype_ind(self, Type, dr, color_index,pcs, point_size=100):
-        #transform_color_index
+        #transform_color_index to only color one celltype and grey out rest
         bo = color_index['celltype'] == Type
         color_index['ind'] = [d if t == True else '#E0E0E0' for t, d in zip(bo, color_index['color_grad'])]
         
@@ -612,18 +592,21 @@ class RegulonsAnalysis():
 
         
     def get_new_names(self, regulon_name_list, regulons ):
+        #Adds the number of genes in a regulon to its name
         a = []
         for i in regulon_name_list:
             a.append(i + ' ' + str(len(self.find_reg_genes(i, regulons))) + 'g')
         return a
     
     def get_regulon_names(self, regulon):
+        #Gets the regulon names
         regulon_names = []
         for i in regulon:
             regulon_names.append(i.name)
         return regulon_names
     
     def find_reg_genes(self, regulon_name, regulons):
+        #Finds the genes of a regulon
         x=0
         for i in regulons:
 
