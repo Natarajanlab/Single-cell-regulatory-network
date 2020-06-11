@@ -1,0 +1,41 @@
+---
+title: "This notebook is used for inference of GRN using BigSCale"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Read in the SCE object of TM - 10X pseudobulk
+```{r}
+sce <- readRDS('/Users/andreas/Downloads/droplet_PB_sce.rds')
+```
+
+Import BigSCale
+```{r}
+library(bigSCale)
+```
+
+Extract the information required to run BigSCale
+```{r}
+expr <- assay(sce, 'counts')
+
+genes <- rownames(sce)
+```
+
+
+Run BigSCale network inference on the subset of genes used for SCENIC
+```{r}
+results=compute.network(expr.data = expr, gene.names = genes, speed.preset = 'fast', clustering = 'direct')
+
+```
+
+Write the correlation matrix to disk
+```{r}
+
+write.table(as.double(results$correlations), file = '/Users/andreas/Downloads/BigScale2_tm10x_network.txt')
+
+```
+
