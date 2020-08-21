@@ -12,7 +12,7 @@ The data directory contain the inferred regulons. Raw data is not included due t
 The notebooks directory contains all notebooks describing the analysis.
 The notebooks are split into 5 groups:
 1. Prep_objects (Modifying raw data for import into R and Python enviorments)
-2. SCMAP (Notebooks for mapping celltypes between atlases)
+2. scmap (Notebooks for mapping celltypes between atlases)
 3. Make_pseudobulk (notebook to generate pseudobulk datasets)
 4. Regulon_inference (Notebooks describing regulon inference with SCENIC)
 5. Regulon_analysis (Notebooks describing the analysis of inferred GRN's)
