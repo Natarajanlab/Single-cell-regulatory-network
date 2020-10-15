@@ -19,5 +19,9 @@ The notebooks are split into 5 groups:
 
 The scripts directory contains misc scripts and functions used throughout the notebooks.
 
-
+## Citation
+This work is now published:\
+[**Predicting gene regulatory networks from cell atlases**](https://www.life-science-alliance.org/content/3/11/e202000658)\
+Andreas Fønss Møller, Kedar Nath Natarajan\
+Life Science Alliance Sep 2020, 3 (11) e202000658; DOI: 10.26508/lsa.202000658
 
